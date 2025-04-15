@@ -1,0 +1,108 @@
+/* Database Connection - db.php */
+<?php
+$host = 'localhost';
+$user = 'root';
+$pass = '';
+$dbname = 'library_management';
+
+$conn = new mysqli($host, $user, $pass, $dbname);
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+?>
+
+/* User Registration - register.php */
+<?php
+include 'db.php';
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $username = $_POST['username'];
+    $email = $_POST['email'];
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+    $role = $_POST['role'];
+
+    $sql = "INSERT INTO users (username, email, password, role) VALUES ('$username', '$email', '$password', '$role')";
+    if ($conn->query($sql) === TRUE) {
+        header("Location: login.php");
+    } else {
+        echo "Error: " . $conn->error;
+    }
+}
+?>
+
+/* User Login - login.php */
+<?php
+include 'db.php';
+session_start();
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $email = $_POST['email'];
+    $password = $_POST['password'];
+
+    $sql = "SELECT * FROM users WHERE email='$email'";
+    $result = $conn->query($sql);
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        if (password_verify($password, $row['password'])) {
+            $_SESSION['user_id'] = $row['id'];
+            $_SESSION['role'] = $row['role'];
+            header("Location: dashboard.php");
+        } else {
+            echo "Invalid password";
+        }
+    } else {
+        echo "User not found";
+    }
+}
+?>
+
+/* Dashboard - dashboard.php */
+<?php
+session_start();
+include 'db.php';
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+}
+?>
+<h2>Welcome to the Dashboard</h2>
+<a href="logout.php">Logout</a>
+
+/* Logout - logout.php */
+<?php
+session_start();
+session_destroy();
+header("Location: login.php");
+?>
+
+/* Books Management - books.php */
+<?php
+include 'db.php';
+$sql = "SELECT * FROM books";
+$result = $conn->query($sql);
+while ($row = $result->fetch_assoc()) {
+    echo "<p>{$row['title']} by {$row['author']} - {$row['availability']}</p>";
+}
+?>
+
+/* Issue Book - issue_book.php */
+<?php
+include 'db.php';
+session_start();
+$user_id = $_SESSION['user_id'];
+$book_id = $_GET['book_id'];
+$sql = "UPDATE books SET availability='Issued' WHERE id='$book_id'";
+$conn->query($sql);
+$sql = "INSERT INTO borrowed_books (user_id, book_id, issue_date) VALUES ('$user_id', '$book_id', NOW())";
+$conn->query($sql);
+header("Location: dashboard.php");
+?>
+
+/* Return Book - return_book.php */
+<?php
+include 'db.php';
+$book_id = $_GET['book_id'];
+$sql = "UPDATE books SET availability='Available' WHERE id='$book_id'";
+$conn->query($sql);
+$sql = "DELETE FROM borrowed_books WHERE book_id='$book_id'";
+$conn->query($sql);
+header("Location: dashboard.php");
+?>
